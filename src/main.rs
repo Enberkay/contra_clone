@@ -1,6 +1,5 @@
 use macroquad::prelude::*;
 
-
 #[allow(dead_code)]
 struct Bullet {
     pos: Vec2,
@@ -18,14 +17,21 @@ struct Game {
     // Sprites
     player_tex: Texture2D,
     enemy_tex: Texture2D,
+
+    // Background
+    background: Texture2D,
+    bg_scroll: f32,
 }
 
 impl Game {
     async fn new() -> Self {
         let player_tex = load_texture("assets/player.png").await.unwrap();
         let enemy_tex = load_texture("assets/enemy.png").await.unwrap();
+        let background = load_texture("assets/background.png").await.unwrap();
+
         player_tex.set_filter(FilterMode::Nearest);
         enemy_tex.set_filter(FilterMode::Nearest);
+        background.set_filter(FilterMode::Nearest);
 
         Self {
             player_pos: vec2(100.0, 300.0),
@@ -37,10 +43,15 @@ impl Game {
 
             player_tex,
             enemy_tex,
+
+            background,
+            bg_scroll: 0.0,
         }
     }
 
     fn update(&mut self) {
+        self.bg_scroll += 1.0;
+
         if !self.player_alive {
             return;
         }
@@ -112,15 +123,29 @@ impl Game {
     fn draw(&self) {
         clear_background(WHITE);
 
+        // Draw scrolling background
+        let bg_width = self.background.width();
+        let scroll = self.bg_scroll % bg_width;
+
+        draw_texture(&self.background, -scroll, 0.0, WHITE);
+        draw_texture(&self.background, -scroll + bg_width, 0.0, WHITE);
+
+        // Draw player
         if self.player_alive {
-            draw_texture(&self.player_tex, self.player_pos.x, self.player_pos.y, WHITE);
+            draw_texture(
+                &self.player_tex,
+                self.player_pos.x,
+                self.player_pos.y,
+                WHITE,
+            );
         }
 
+        // Draw enemies
         for e in &self.enemy_pos {
             draw_texture(&self.enemy_tex, e.x, e.y, WHITE);
         }
 
-        // Bullets: still use rectangles
+        // Draw bullets
         for b in &self.player_bullets {
             draw_rectangle(b.pos.x, b.pos.y, 10.0, 5.0, RED);
         }
@@ -129,8 +154,10 @@ impl Game {
             draw_rectangle(b.pos.x, b.pos.y, 10.0, 5.0, BLACK);
         }
 
+        // Score
         draw_text(&format!("Score: {}", self.score), 10.0, 30.0, 30.0, BLACK);
 
+        // Game over
         if !self.player_alive {
             draw_text(
                 "GAME OVER",
@@ -143,7 +170,7 @@ impl Game {
     }
 }
 
-#[macroquad::main("Contra Clone v0.4.1")]
+#[macroquad::main("Contra Clone v0.5.0")]
 async fn main() {
     let mut game = Game::new().await;
 

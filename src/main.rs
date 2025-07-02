@@ -1,210 +1,155 @@
 use macroquad::prelude::*;
 
-struct Player {
+
+#[allow(dead_code)]
+struct Bullet {
     pos: Vec2,
-    bullets: Vec<Vec2>,
-    alive: bool,
+    from_enemy: bool,
 }
 
-struct Enemy {
-    pos: Vec2,
-    bullet_timer: f32,
+struct Game {
+    player_pos: Vec2,
+    player_bullets: Vec<Bullet>,
+    enemy_pos: Vec<Vec2>,
+    enemy_bullets: Vec<Bullet>,
+    player_alive: bool,
+    score: u32,
+
+    // Sprites
+    player_tex: Texture2D,
+    enemy_tex: Texture2D,
 }
 
-struct EnemyBullet {
-    pos: Vec2,
-}
+impl Game {
+    async fn new() -> Self {
+        let player_tex = load_texture("assets/player.png").await.unwrap();
+        let enemy_tex = load_texture("assets/enemy.png").await.unwrap();
+        player_tex.set_filter(FilterMode::Nearest);
+        enemy_tex.set_filter(FilterMode::Nearest);
 
-impl Player {
-    fn new() -> Self {
         Self {
-            pos: vec2(100.0, 300.0),
-            bullets: vec![],
-            alive: true,
+            player_pos: vec2(100.0, 300.0),
+            player_bullets: vec![],
+            enemy_pos: vec![vec2(600.0, 200.0)],
+            enemy_bullets: vec![],
+            player_alive: true,
+            score: 0,
+
+            player_tex,
+            enemy_tex,
         }
     }
 
     fn update(&mut self) {
-        if !self.alive {
+        if !self.player_alive {
             return;
         }
 
         let speed = 3.0;
         if is_key_down(KeyCode::A) {
-            self.pos.x -= speed;
+            self.player_pos.x -= speed;
         }
         if is_key_down(KeyCode::D) {
-            self.pos.x += speed;
+            self.player_pos.x += speed;
         }
         if is_key_down(KeyCode::W) {
-            self.pos.y -= speed;
+            self.player_pos.y -= speed;
         }
         if is_key_down(KeyCode::S) {
-            self.pos.y += speed;
+            self.player_pos.y += speed;
         }
 
         if is_key_pressed(KeyCode::Space) {
-            self.bullets.push(vec2(self.pos.x + 20.0, self.pos.y));
+            self.player_bullets.push(Bullet {
+                pos: self.player_pos + vec2(20.0, 8.0),
+                from_enemy: false,
+            });
         }
 
-        for bullet in &mut self.bullets {
-            bullet.x += 5.0;
+        for bullet in &mut self.player_bullets {
+            bullet.pos.x += 5.0;
         }
-        self.bullets.retain(|b| b.x < screen_width());
-    }
+        self.player_bullets.retain(|b| b.pos.x < screen_width());
 
-    fn draw(&self) {
-        if self.alive {
-            draw_rectangle(self.pos.x, self.pos.y, 30.0, 30.0, BLUE);
+        // Enemy movement
+        for e in &mut self.enemy_pos {
+            e.x -= 1.0;
         }
-        for bullet in &self.bullets {
-            draw_rectangle(bullet.x, bullet.y + 10.0, 10.0, 5.0, RED);
-        }
-    }
 
-    fn hitbox(&self) -> Rect {
-        Rect::new(self.pos.x, self.pos.y, 30.0, 30.0)
-    }
-}
-
-impl Enemy {
-    fn new(x: f32, y: f32) -> Self {
-        Self {
-            pos: vec2(x, y),
-            bullet_timer: 0.0,
-        }
-    }
-
-    fn update(&mut self, dt: f32) {
-        self.pos.x -= 2.0;
-        self.bullet_timer += dt;
-    }
-
-    fn can_shoot(&self) -> bool {
-        self.bullet_timer > 2.0
-    }
-
-    fn shoot(&mut self) -> EnemyBullet {
-        self.bullet_timer = 0.0;
-        EnemyBullet {
-            pos: vec2(self.pos.x - 10.0, self.pos.y + 10.0),
-        }
-    }
-
-    fn draw(&self) {
-        draw_rectangle(self.pos.x, self.pos.y, 30.0, 30.0, DARKGRAY);
-    }
-
-    fn hitbox(&self) -> Rect {
-        Rect::new(self.pos.x, self.pos.y, 30.0, 30.0)
-    }
-}
-
-impl EnemyBullet {
-    fn update(&mut self) {
-        self.pos.x -= 4.0;
-    }
-
-    fn draw(&self) {
-        draw_rectangle(self.pos.x, self.pos.y, 10.0, 5.0, BLACK);
-    }
-
-    fn hitbox(&self) -> Rect {
-        Rect::new(self.pos.x, self.pos.y, 10.0, 5.0)
-    }
-}
-
-#[macroquad::main("Contra Clone v0.3.0")]
-async fn main() {
-    let mut player = Player::new();
-    let mut enemies: Vec<Enemy> = vec![];
-    let mut enemy_bullets: Vec<EnemyBullet> = vec![];
-    let mut spawn_timer = 0.0;
-    let mut score: u32 = 0;
-
-    loop {
-        clear_background(WHITE);
-        let dt = get_frame_time();
-
-        if player.alive {
-            spawn_timer += dt;
-            if spawn_timer > 1.5 {
-                spawn_timer = 0.0;
-                let y = rand::gen_range(0.0, screen_height() - 30.0);
-                enemies.push(Enemy::new(screen_width(), y));
+        // Enemy shooting
+        for e in &self.enemy_pos {
+            if rand::gen_range(0.0, 1.0) < 0.01 {
+                self.enemy_bullets.push(Bullet {
+                    pos: *e + vec2(-5.0, 8.0),
+                    from_enemy: true,
+                });
             }
         }
 
-        // --- Update ---
-        player.update();
-        for enemy in &mut enemies {
-            enemy.update(dt);
-            if enemy.can_shoot() {
-                enemy_bullets.push(enemy.shoot());
-            }
-        }
-        for bullet in &mut enemy_bullets {
-            bullet.update();
+        for bullet in &mut self.enemy_bullets {
+            bullet.pos.x -= 4.0;
         }
 
-        // ตรวจชนกระสุนผู้เล่นกับศัตรู
-        enemies.retain(|enemy| {
-            for bullet in &player.bullets {
-                let bullet_rect = Rect::new(bullet.x, bullet.y + 10.0, 10.0, 5.0);
-                if bullet_rect.overlaps(&enemy.hitbox()) {
-                    score += 10;
+        // Bullet hits enemy
+        self.enemy_pos.retain(|enemy| {
+            for b in &self.player_bullets {
+                if b.pos.distance(*enemy) < 16.0 {
+                    self.score += 10;
                     return false;
                 }
             }
             true
         });
 
-        // ตรวจชนผู้เล่นกับศัตรูหรือกระสุนศัตรู
-        if player.alive {
-            for enemy in &enemies {
-                if enemy.hitbox().overlaps(&player.hitbox()) {
-                    player.alive = false;
-                }
-            }
-            for bullet in &enemy_bullets {
-                if bullet.hitbox().overlaps(&player.hitbox()) {
-                    player.alive = false;
-                }
+        // Bullet hits player
+        for b in &self.enemy_bullets {
+            if b.pos.distance(self.player_pos) < 16.0 {
+                self.player_alive = false;
             }
         }
+    }
 
-        // --- Draw ---
-        player.draw();
-        for enemy in &enemies {
-            enemy.draw();
+    fn draw(&self) {
+        clear_background(WHITE);
+
+        if self.player_alive {
+            draw_texture(&self.player_tex, self.player_pos.x, self.player_pos.y, WHITE);
         }
-        for bullet in &enemy_bullets {
-            bullet.draw();
+
+        for e in &self.enemy_pos {
+            draw_texture(&self.enemy_tex, e.x, e.y, WHITE);
         }
 
-        draw_text(&format!("Score: {}", score), 10.0, 30.0, 30.0, BLACK);
+        // Bullets: still use rectangles
+        for b in &self.player_bullets {
+            draw_rectangle(b.pos.x, b.pos.y, 10.0, 5.0, RED);
+        }
 
-        if !player.alive {
-            let msg = "GAME OVER";
-            let w = measure_text(msg, None, 40, 1.0).width;
+        for b in &self.enemy_bullets {
+            draw_rectangle(b.pos.x, b.pos.y, 10.0, 5.0, BLACK);
+        }
+
+        draw_text(&format!("Score: {}", self.score), 10.0, 30.0, 30.0, BLACK);
+
+        if !self.player_alive {
             draw_text(
-                msg,
-                screen_width() / 2.0 - w / 2.0,
+                "GAME OVER",
+                screen_width() / 2.0 - 100.0,
                 screen_height() / 2.0,
                 40.0,
                 RED,
             );
-            let final_msg = format!("Final Score: {}", score);
-            let w2 = measure_text(&final_msg, None, 30, 1.0).width;
-            draw_text(
-                &final_msg,
-                screen_width() / 2.0 - w2 / 2.0,
-                screen_height() / 2.0 + 40.0,
-                30.0,
-                DARKGRAY,
-            );
         }
+    }
+}
 
+#[macroquad::main("Contra Clone v0.4.1")]
+async fn main() {
+    let mut game = Game::new().await;
+
+    loop {
+        game.update();
+        game.draw();
         next_frame().await;
     }
 }

@@ -29,6 +29,14 @@ struct Game {
     // Health
     player_health: i32,
     player_max_health: i32,
+
+    // Damage hit effect
+    last_hit_time: f32,
+    damage_display_timer: f32,
+    show_damage: bool,
+
+    // Enemy shooting timer
+    enemy_shoot_timer: f32,
 }
 
 impl Game {
@@ -67,6 +75,10 @@ impl Game {
 
             player_health: 10,
             player_max_health: 10,
+            last_hit_time: -1.0,
+            damage_display_timer: 0.0,
+            show_damage: false,
+            enemy_shoot_timer: 0.0,
         }
     }
 
@@ -131,14 +143,16 @@ impl Game {
             e.y = ground_y - self.enemy_tex.height();
         }
 
-        // Enemy shooting
-        for e in &self.enemy_pos {
-            if rand::gen_range(0.0, 1.0) < 0.01 {
+        // Enemy shooting every 2 seconds
+        self.enemy_shoot_timer += get_frame_time();
+        if self.enemy_shoot_timer >= 2.0 {
+            for e in &self.enemy_pos {
                 self.enemy_bullets.push(Bullet {
                     pos: *e + vec2(-5.0, 8.0),
                     from_enemy: true,
                 });
             }
+            self.enemy_shoot_timer = 0.0;
         }
 
         for bullet in &mut self.enemy_bullets {
@@ -156,13 +170,27 @@ impl Game {
             true
         });
 
-        // Bullet hits player
+        // Bullet hits player with cooldown
+        let current_time = get_time() as f32;
         for b in &self.enemy_bullets {
             if b.pos.distance(self.player_pos) < 16.0 {
-                self.player_health -= 1;
-                if self.player_health <= 0 {
-                    self.player_alive = false;
+                if current_time - self.last_hit_time >= 0.5 {
+                    self.player_health -= 1;
+                    self.last_hit_time = current_time;
+                    self.damage_display_timer = 0.5;
+                    self.show_damage = true;
+                    if self.player_health <= 0 {
+                        self.player_alive = false;
+                    }
                 }
+            }
+        }
+
+        // Update damage display timer
+        if self.damage_display_timer > 0.0 {
+            self.damage_display_timer -= get_frame_time();
+            if self.damage_display_timer <= 0.0 {
+                self.show_damage = false;
             }
         }
     }
@@ -170,7 +198,7 @@ impl Game {
     fn draw(&self) {
         clear_background(SKYBLUE);
 
-        // Draw sky full screen
+        // Draw sky
         draw_texture_ex(
             &self.sky_tex,
             0.0,
@@ -182,7 +210,7 @@ impl Game {
             },
         );
 
-        // Draw ground with horizontal tiling
+        // Draw ground tiling
         let ground_y = screen_height() - self.ground_tex.height();
         let mut x = -self.bg_scroll % self.ground_tex.width();
         while x < screen_width() {
@@ -209,7 +237,6 @@ impl Game {
         for b in &self.player_bullets {
             draw_rectangle(b.pos.x, b.pos.y, 10.0, 5.0, RED);
         }
-
         for b in &self.enemy_bullets {
             draw_rectangle(b.pos.x, b.pos.y, 10.0, 5.0, BLACK);
         }
@@ -217,13 +244,31 @@ impl Game {
         // Score
         draw_text(&format!("Score: {}", self.score), 10.0, 30.0, 30.0, BLACK);
 
-        // Draw HP Bar
+        // HP Bar
         let bar_width = 200.0;
         let bar_height = 20.0;
         let health_ratio = self.player_health as f32 / self.player_max_health as f32;
-        draw_rectangle(10.0, 60.0, bar_width, bar_height, GRAY); // background bar
-        draw_rectangle(10.0, 60.0, bar_width * health_ratio, bar_height, GREEN); // health portion
-        draw_rectangle_lines(10.0, 60.0, bar_width, bar_height, 2.0, DARKGRAY); // border
+        draw_rectangle(10.0, 60.0, bar_width, bar_height, GRAY);
+        draw_rectangle(10.0, 60.0, bar_width * health_ratio, bar_height, GREEN);
+        draw_rectangle_lines(10.0, 60.0, bar_width, bar_height, 2.0, DARKGRAY);
+        draw_text(
+            &format!("HP: {}/{}", self.player_health, self.player_max_health),
+            15.0,
+            75.0,
+            20.0,
+            BLACK,
+        );
+
+        // Show "-1 HP" when hit
+        if self.show_damage {
+            draw_text(
+                "-1 HP",
+                self.player_pos.x,
+                self.player_pos.y - 20.0,
+                20.0,
+                RED,
+            );
+        }
 
         // Game over
         if !self.player_alive {

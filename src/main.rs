@@ -104,7 +104,7 @@ impl Game {
         }
 
         // Jump
-        if self.is_on_ground && (is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Space)) {
+        if self.is_on_ground && (is_key_pressed(KeyCode::W)) {
             self.velocity.y = JUMP_FORCE;
             self.is_on_ground = false;
         }

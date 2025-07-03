@@ -26,8 +26,9 @@ struct Game {
     ground_tex: Texture2D,
     bg_scroll: f32,
 
-    // New: Player Health
+    // Health
     player_health: i32,
+    player_max_health: i32,
 }
 
 impl Game {
@@ -64,8 +65,8 @@ impl Game {
             ground_tex,
             bg_scroll: 0.0,
 
-            // Initial HP
-            player_health: 3,
+            player_health: 10,
+            player_max_health: 10,
         }
     }
 
@@ -216,14 +217,13 @@ impl Game {
         // Score
         draw_text(&format!("Score: {}", self.score), 10.0, 30.0, 30.0, BLACK);
 
-        // Draw HP
-        draw_text(
-            &format!("HP: {}", self.player_health),
-            10.0,
-            60.0,
-            30.0,
-            DARKGREEN,
-        );
+        // Draw HP Bar
+        let bar_width = 200.0;
+        let bar_height = 20.0;
+        let health_ratio = self.player_health as f32 / self.player_max_health as f32;
+        draw_rectangle(10.0, 60.0, bar_width, bar_height, GRAY); // background bar
+        draw_rectangle(10.0, 60.0, bar_width * health_ratio, bar_height, GREEN); // health portion
+        draw_rectangle_lines(10.0, 60.0, bar_width, bar_height, 2.0, DARKGRAY); // border
 
         // Game over
         if !self.player_alive {

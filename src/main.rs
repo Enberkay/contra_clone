@@ -134,9 +134,9 @@ impl Game {
         self.player_bullets.retain(|b| b.pos.x < screen_width());
 
         // Enemy movement
-        for e in &mut self.enemy_pos {
-            e.x -= 1.0;
-        }
+        // for e in &mut self.enemy_pos {
+        //     e.x -= 1.0;
+        // }
 
         // Enemy Y alignment
         for e in &mut self.enemy_pos {

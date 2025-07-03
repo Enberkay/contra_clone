@@ -25,6 +25,9 @@ struct Game {
     sky_tex: Texture2D,
     ground_tex: Texture2D,
     bg_scroll: f32,
+
+    // New: Player Health
+    player_health: i32,
 }
 
 impl Game {
@@ -60,6 +63,9 @@ impl Game {
             sky_tex,
             ground_tex,
             bg_scroll: 0.0,
+
+            // Initial HP
+            player_health: 3,
         }
     }
 
@@ -152,7 +158,10 @@ impl Game {
         // Bullet hits player
         for b in &self.enemy_bullets {
             if b.pos.distance(self.player_pos) < 16.0 {
-                self.player_alive = false;
+                self.player_health -= 1;
+                if self.player_health <= 0 {
+                    self.player_alive = false;
+                }
             }
         }
     }
@@ -206,6 +215,15 @@ impl Game {
 
         // Score
         draw_text(&format!("Score: {}", self.score), 10.0, 30.0, 30.0, BLACK);
+
+        // Draw HP
+        draw_text(
+            &format!("HP: {}", self.player_health),
+            10.0,
+            60.0,
+            30.0,
+            DARKGREEN,
+        );
 
         // Game over
         if !self.player_alive {
